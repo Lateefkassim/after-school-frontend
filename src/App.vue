@@ -17,6 +17,7 @@ export default {
       name: '',
       phone: '',
       message: '',
+      error: '',
     }
   },
 
@@ -74,14 +75,14 @@ export default {
       fetch(API + '/lessons')
         .then((res) => res.json())
         .then((data) => this.showLessons(data))
-        .catch(() => (this.message = 'Could not load the lessons'))
+        .catch(() => (this.error = 'Could not load the lessons'))
     },
 
     getTeachers() {
       fetch(API + '/teachers')
         .then((res) => res.json())
         .then((data) => (this.teachers = data))
-        .catch(() => (this.message = 'Could not load the teachers'))
+        .catch(() => (this.error = 'Could not load the teachers'))
     },
 
     search() {
@@ -93,7 +94,7 @@ export default {
       fetch(API + '/search?q=' + encodeURIComponent(this.searchText))
         .then((res) => res.json())
         .then((data) => this.showLessons(data))
-        .catch(() => (this.message = 'Search failed'))
+        .catch(() => (this.error = 'Search failed'))
     },
 
     chooseTeacher() {
@@ -105,11 +106,12 @@ export default {
       fetch(API + '/teachers/' + this.teacherId + '/lessons')
         .then((res) => res.json())
         .then((data) => this.showLessons(data))
-        .catch(() => (this.message = 'Could not load the teacher lessons'))
+        .catch(() => (this.error = 'Could not load the teacher lessons'))
     },
 
     // takes the spaces that are already in the cart off the lessons
     showLessons(data) {
+      this.error = ''
       for (const lesson of data) {
         const item = this.cart.find((i) => i.lessonId === lesson._id)
         if (item) {
@@ -184,28 +186,35 @@ export default {
           this.showCart = false
           this.getLessons()
         })
-        .catch(() => (this.message = 'Could not submit the order'))
+        .catch(() => (this.error = 'Could not submit the order'))
     },
   },
 }
 </script>
 
 <template>
-  <div class="page">
-    <header>
+  <header class="topbar">
+    <div class="topbar-inner">
       <h1><i class="fa-solid fa-graduation-cap"></i> After School Classes</h1>
       <button class="cart-button" :disabled="cart.length === 0" @click="showCart = !showCart">
         <i class="fa-solid fa-cart-shopping"></i>
-        {{ showCart ? 'Back to lessons' : 'Cart (' + cartCount + ')' }}
+        {{ showCart ? 'Back to lessons' : 'Cart' }}
+        <span v-if="!showCart" class="badge">{{ cartCount }}</span>
       </button>
-    </header>
+    </div>
+  </header>
 
-    <p v-if="message" class="message">{{ message }}</p>
+  <main class="page">
+    <p v-if="message" class="message success"><i class="fa-solid fa-circle-check"></i> {{ message }}</p>
+    <p v-if="error" class="message failed"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</p>
 
     <!-- lessons page -->
     <div v-if="!showCart">
       <div class="controls">
-        <input v-model="searchText" @input="search" placeholder="Search lessons" />
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input v-model="searchText" @input="search" placeholder="Search lessons" />
+        </div>
 
         <select v-model="teacherId" @change="chooseTeacher">
           <option value="">All teachers</option>
@@ -227,167 +236,379 @@ export default {
         </select>
       </div>
 
-      <p v-if="lessons.length === 0">No lessons found.</p>
+      <p v-if="lessons.length === 0" class="empty">No lessons found.</p>
 
       <div class="lessons">
         <div class="lesson" v-for="lesson in sortedLessons" :key="lesson._id">
           <img :src="imageUrl + lesson.image" :alt="lesson.topic" />
-          <h2><i :class="lesson.icon"></i> {{ lesson.topic }}</h2>
-          <p><i class="fa-solid fa-location-dot"></i> {{ lesson.location }}</p>
-          <p><i class="fa-solid fa-sterling-sign"></i> {{ lesson.price }}</p>
-          <p><i class="fa-solid fa-users"></i> Spaces: {{ lesson.space }}</p>
-          <button :disabled="lesson.space === 0" @click="addToCart(lesson)">Add to Cart</button>
+
+          <div class="lesson-body">
+            <div class="lesson-title">
+              <h2><i :class="lesson.icon"></i> {{ lesson.topic }}</h2>
+              <span class="price">£{{ lesson.price }}</span>
+            </div>
+
+            <p class="location"><i class="fa-solid fa-location-dot"></i> {{ lesson.location }}</p>
+
+            <p class="spaces" :class="{ low: lesson.space > 0 && lesson.space <= 2, full: lesson.space === 0 }">
+              <i class="fa-solid fa-users"></i> Spaces: {{ lesson.space }}
+            </p>
+
+            <button :disabled="lesson.space === 0" @click="addToCart(lesson)">Add to Cart</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- cart page with checkout -->
-    <div v-else class="cart">
-      <h2>Your Cart</h2>
+    <div v-else class="cart-page">
+      <div class="card">
+        <h2>Your Cart</h2>
 
-      <div class="cart-item" v-for="item in cart" :key="item.lessonId">
-        <span>{{ item.topic }} ({{ item.location }})</span>
-        <span>{{ item.spaces }} x £{{ item.price }}</span>
-        <button class="remove" @click="removeFromCart(item)">Remove</button>
+        <div class="cart-item" v-for="item in cart" :key="item.lessonId">
+          <div class="cart-info">
+            <strong>{{ item.topic }}</strong>
+            <span>{{ item.location }}</span>
+          </div>
+          <span>{{ item.spaces }} x £{{ item.price }}</span>
+          <button class="remove" @click="removeFromCart(item)">Remove</button>
+        </div>
+
+        <p class="total">Total: £{{ totalPrice }}</p>
       </div>
 
-      <p class="total">Total: £{{ totalPrice }}</p>
+      <div class="card">
+        <h2>Checkout</h2>
 
-      <h2>Checkout</h2>
-      <input v-model="name" placeholder="Name" />
-      <p class="error" v-if="name !== '' && !nameValid">Name must be letters only</p>
-      <input v-model="phone" placeholder="Phone" />
-      <p class="error" v-if="phone !== '' && !phoneValid">Phone must be numbers only</p>
+        <label for="name">Name</label>
+        <input id="name" v-model="name" placeholder="Your name" />
+        <p class="error" v-if="name !== '' && !nameValid">Name must be letters only</p>
 
-      <button :disabled="!nameValid || !phoneValid" @click="checkout">Checkout</button>
+        <label for="phone">Phone</label>
+        <input id="phone" v-model="phone" placeholder="Your phone number" />
+        <p class="error" v-if="phone !== '' && !phoneValid">Phone must be numbers only</p>
+
+        <button class="checkout" :disabled="!nameValid || !phoneValid" @click="checkout">Checkout</button>
+      </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <style>
+:root {
+  --blue: #2563eb;
+  --blue-dark: #1d4ed8;
+  --background: #f1f5f9;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --red: #dc2626;
+  --green: #16a34a;
+}
+
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f3f4f6;
-  color: #222;
+  font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--background);
+  color: var(--text);
 }
 
-.page {
-  max-width: 1000px;
+/* top bar */
+.topbar {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar-inner {
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 20px;
-}
-
-header {
+  padding: 14px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 22px;
 }
 
+h1 i {
+  color: var(--blue);
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+/* buttons */
 button {
-  background: #2c7be5;
+  background: var(--blue);
   color: white;
   border: none;
   padding: 10px 16px;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 15px;
+  font-weight: 600;
+}
+
+button:hover:not(:disabled) {
+  background: var(--blue-dark);
 }
 
 button:disabled {
-  background: #aaa;
+  background: #cbd5e1;
   cursor: not-allowed;
 }
 
+.badge {
+  background: white;
+  color: var(--blue);
+  border-radius: 20px;
+  padding: 1px 8px;
+  margin-left: 4px;
+  font-size: 13px;
+}
+
+/* messages */
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 0 0 20px;
+}
+
+.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* search, teacher and sort */
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 12px;
+  background: white;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-box i {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  color: var(--muted);
+}
+
+.search-box input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 36px;
 }
 
 input,
 select {
-  padding: 9px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   font-size: 15px;
+  background: white;
+  color: var(--text);
 }
 
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+}
+
+/* lesson cards */
 .lessons {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
 }
 
 .lesson {
   background: white;
-  padding: 14px;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.lesson:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
 .lesson img {
   width: 100%;
-  border-radius: 5px;
+  height: 150px;
+  object-fit: cover;
+  display: block;
 }
 
-.lesson h2 {
-  font-size: 20px;
-  margin: 10px 0;
+.lesson-body {
+  padding: 16px;
 }
 
-.lesson p {
-  margin: 6px 0;
+.lesson-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lesson-title h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.lesson-title h2 i {
+  color: var(--blue);
+}
+
+.price {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--green);
+}
+
+.location {
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+.spaces {
+  color: var(--green);
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.spaces.low {
+  color: #d97706;
+}
+
+.spaces.full {
+  color: var(--red);
 }
 
 .lesson button {
   width: 100%;
-  margin-top: 8px;
 }
 
-.cart {
+/* cart page */
+.cart-page {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.card {
   background: white;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
-.cart input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 10px;
+.card h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
 }
 
 .cart-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #ddd;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cart-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.cart-info span {
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .remove {
-  background: #d9534f;
+  background: var(--red);
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.remove:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
 .total {
-  font-weight: bold;
+  text-align: right;
+  font-weight: 700;
+  font-size: 18px;
+  margin: 16px 0 0;
 }
 
-.message {
-  background: #d4edda;
-  padding: 12px;
-  border-radius: 5px;
+/* checkout form */
+.card label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.card input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 14px;
 }
 
 .error {
-  color: #d9534f;
-  margin: 0 0 10px;
+  color: var(--red);
+  font-size: 14px;
+  margin: -8px 0 14px;
+}
+
+.checkout {
+  width: 100%;
+}
+
+/* small screens */
+@media (max-width: 700px) {
+  .cart-page {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
 }
 </style>
