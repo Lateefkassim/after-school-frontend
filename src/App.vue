@@ -1,6 +1,6 @@
 <script>
 // change this to the render.com address after deploying
-const API = 'http://localhost:3000'
+const API = 'https://m01142449-after-school.onrender.com'
 
 export default {
   data() {
