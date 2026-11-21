@@ -2,6 +2,14 @@
 
 This is the Vue.js app for my after school classes app (CST3144). You can look at the lessons, search and sort them, add them to a cart and check out. It gets its data from my Express server using `fetch`.
 
+## What it does
+
+- Shows the lessons with a picture, price, location and spaces left
+- Sort by subject, location, price or spaces, ascending or descending
+- Search (done on the server) and filter by teacher
+- Add lessons to a cart and remove them again
+- Checkout with a name (letters only) and phone (numbers only)
+
 ## How to run it
 
 1. Run `npm install`
