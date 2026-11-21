@@ -1,5 +1,5 @@
 <script>
-// change this to the render.com address after deploying
+// address of my server on render.com
 const API = 'https://m01142449-after-school.onrender.com'
 
 export default {
